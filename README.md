@@ -9,7 +9,6 @@ This is a small Python script that transfers YouTube playlists to [FreeTube](htt
 - [Possible Errors and Issues](#possible-errors-and-issues)
     - [Unavailable videos](#unavailable-videos)
     - [Missing user authentication](#missing-user-authentication)
-    - [Issues with Cookies](#issues-with-cookies)
 - [Technical Details](#technical-details)
 
 ## Usage
@@ -35,6 +34,8 @@ Last used versions for development:
 ## Possible Errors and Issues 
 Listed in this segment are a few errors I've encountered when trying to extract playlist data using _yt-dlp_. So far I've tested the program using a few playlists with video counts ranging from 5 to 1500. Below that you can find more info on using cookies.
 
+These errors do not not hinder the program from running, but your playlists might not have been transferred 100% correctly. The error entries are output at the end of execution so you can investigate which videos failed to be loaded.
+
 ### Unavailable videos
 The following errors occur when trying to access videos that have become unavailable due to copyright claims, TOS violations or other (unspecified) reasons, as well as videos that have been privated by the owner. Unfortunately, neither _yt-dlp_ or I can do anything about this.
 ```
@@ -48,7 +49,7 @@ ERROR: [youtube] [VIDEO ID]: Video unavailable. This video is not available
 ```
 
 ### Missing user authentication
-When attempting to access age-restricted videos (_Error 1_), your own private playlist (_Error 2_), or other videos that are only available when authenticated (_Errors 3 and 4), you may need to pass cookies to ``ytftpl.py`` in order to make it work. See [Usage](#usage) and [Issues with Cookies](#issues-with-cookies) for more information.
+When attempting to access age-restricted videos (**Error 1**), your own private playlist (**Error 2**), or other videos that are only available when authenticated (**Errors 3 and 4**), you may need to pass cookies to ``ytftpl.py`` in order to make it work. See [Usage](#usage) and the [yt-dlp]([text](https://www.youtube.com/playlist?list=WL)) documentation for more information.
 ```
 ERROR: [youtube] [VIDEO ID]: Sign in to confirm your age. This video may be inappropriate for some users. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
 
@@ -59,10 +60,7 @@ ERROR: [youtube] [VIDEO ID]: Join this channel to get access to members-only con
 ERROR: [youtube] [VIDEO ID]: Private video. Sign in if you've been granted access to this video. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
 ```
 
-These errors are removed in Python as to not hinder the program from continuing running, but your playlists might not have been transferred 100% correctly. The error entries are output at the end of execution so you can investigate which videos failed to be loaded.
-
-### Issues with Cookies
-[here](https://github.com/yt-dlp/yt-dlp?tab=readme-ov-file#filesystem-options) in the option ``--cookies-from-browser``
+I've found that when exporting a larger playlist (e.g. around 150 videos), age-restricted videos may give you **Error 1** despite passing cookies to _yt-dlp_ and being able to work through the rest of even a private playlist without problem. As of now, I do not know how to resolve this issue.
 
 ## Technical Details
 _FreeTube_ uses a NPM module called [nedb](https://www.npmjs.com/package/@seald-io/nedb) to save data locally, including the user's playlists. They are stored in a file called ``playlists.db`` in a JSON-like format in one of the following locations, according to the [FreeTube documentation](https://docs.freetubeapp.io/usage/data-location/):
@@ -152,7 +150,7 @@ This outputs each video of the given playlist to the console in the following fo
 
 I wasn't able to output the name of the playlist separately, so unfortunately for now it is included in every video object.
 
-This data is then processed in Python. Here is a table of the fields, from _yt-dlp_ on the left to the corresponding values in _FreeTube's_ ``playists.db`` on the right:
+This data is then processed to the correct format in Python, as seen at the top of this section. Here is a table of the fields, from _yt-dlp_ on the left to the corresponding values in _FreeTube's_ ``playists.db`` on the right:
 
 | **yt-dlp**     | **FreeTube**  |
 |----------------|---------------|
