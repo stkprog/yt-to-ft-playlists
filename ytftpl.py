@@ -1,10 +1,8 @@
-from uuid import uuid4          
-from yt_dlp import YoutubeDL
+from uuid import uuid4
 from time import time
 import json
 import os
 import sys
-import platform
 import argparse
 
 parser = argparse.ArgumentParser(description="This is a small Python script that transfers YouTube playlists to FreeTube.", add_help=True)
