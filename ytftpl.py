@@ -12,7 +12,11 @@ class PlaylistDoesntExistException(Exception):
     """Playlist either does not exist or can't be found because it is private."""
 
     def __init__(self):
-        super().__init__("\nYT-DLP Error. If you are trying to transfer a private playlist you have access to, provide cookies to the script.")
+        super().__init__("YT-DLP Error. If you are trying to transfer a private playlist you have access to, provide cookies to the script.")
+
+def print_colorful_error(error_message : str) -> None:
+    print(Fore.RED + error_message[0:6], end="")
+    print(Style.RESET_ALL + error_message[6:], end="")
 
 def initialize_parser() -> argparse.ArgumentParser:
     """Creates and returns the command line argument parser."""
@@ -57,20 +61,22 @@ def get_unprocessed_playlist_json_from_youtube(ytlp_command : str) -> tuple:
     cookies_given : bool = ytlp_command.find("--cookies-from-browser") != -1
     age_restr_message = "Sign in to confirm your age. This video may be inappropriate for some users."
     id_pattern : str = "[A-Za-z0-9_-]{10}[AEIMQUYcgkosw048]"
-    
-    for line in iter(command.stdout.readline, ""):
+
+    first_line = command.stdout.readline()
+    if first_line.find("YouTube said: The playlist does not exist.") != -1:
+        print_colorful_error(first_line)
+        raise PlaylistDoesntExistException()
+
+    for line in command.stdout:
         if line.startswith("ERROR"):
             is_age_restr_error : bool = line.find(age_restr_message) != -1
-            print(Fore.RED + line[0:6], end="")
-            print(Style.RESET_ALL + line[6:], end="")
+            print_colorful_error(line)
 
-            print("\nis_age_restr_error: " + str(is_age_restr_error))
-            print("cookies_given: " + str(cookies_given))
             if is_age_restr_error and cookies_given:
                 age_restr_errors.append(re.search(id_pattern, line).group())
         else:
             print(line, end="")
-            output += (line)
+            output += line
 
     return (output, age_restr_errors)
 
@@ -153,13 +159,10 @@ def main():
 
     try:
         unpr_playlist, errors = get_unprocessed_playlist_json_from_youtube(ytlp_command=command)
-        print("\n")
-        print(unpr_playlist)
-        print("\n")
-        print(errors)
     except PlaylistDoesntExistException as error:
         print(error)
         sys.exit(1)
+    
     # pr_playlist_string : str = process_playlist_data(unpr_playlist_json)
     # print("\n" + pr_playlist_string)
 
