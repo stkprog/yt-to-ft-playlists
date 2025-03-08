@@ -1,9 +1,12 @@
-from uuid import uuid4
-from time import time
-import json
-import os
-import sys
-import argparse
+from colorama import init, Fore, Style      # Colored text
+from subprocess import Popen, PIPE, STDOUT  # Opening yt-dlp
+from uuid import uuid4  # Getting version 4 uuids
+from time import time   # Getting current UNIX timestamp
+import json             # JSON
+import re               # RegEx
+import os               # Path opening and such
+import sys              # Check which OS, exit
+import argparse         # Clean CLI
 
 class PlaylistDoesntExistException(Exception):
     """Playlist either does not exist or can't be found because it is private."""
@@ -12,24 +15,55 @@ class PlaylistDoesntExistException(Exception):
         super().__init__("\nYT-DLP Error. If you are trying to transfer a private playlist you have access to, provide cookies to the script.")
 
 def initialize_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="This is a small Python script that transfers YouTube playlists to FreeTube.", add_help=True)
-    parser.add_argument("playlist_url", help="Full URL of the playlist you want to transfer", type=str)
-    parser.add_argument("-c", "--browser-cookies", help="Use cookies from the specified browser for private playlists or age-restricted videos", type=str, required=False, metavar="NAME OF BROWSER")
-    parser.add_argument("-s", "--sleep", help="Time in seconds to sleep between videos. Can be used to combat rate limiting for longer playlists, e.g. a value of 5", type=int, required=False, metavar="SLEEP SECONDS")
+    parser = argparse.ArgumentParser(
+        description="This is a small Python script that transfers YouTube playlists to FreeTube.",
+        add_help=True
+    )
+    parser.add_argument(
+        "playlist_url",
+        help="Full URL of the playlist you want to transfer",
+        type=str
+    )
+    parser.add_argument(
+        "-c", "--browser-cookies",
+        help="Use cookies from the specified browser for private playlists or age-restricted videos",
+        type=str,
+        required=False,
+        metavar="NAME OF BROWSER"
+    )
+    parser.add_argument(
+        "-s", "--sleep",help="Time in seconds to sleep between videos. Can be used to combat rate limiting for longer playlists, e.g. a value of 5",
+        type=int,
+        required=False,
+        metavar="SLEEP SECONDS"
+    )
     return parser
 
-def get_unprocessed_playlist_json_from_youtube(ytlp_command : str) -> dict:
-    command_file = os.popen(ytlp_command)
-    unpr_playlist_string : str = command_file.read()
-    status = command_file.close()
+def get_unprocessed_playlist_json_from_youtube(ytlp_command : str) -> tuple:
+    command = Popen(ytlp_command, shell=True, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+    
+    output : str = ""
+    age_restr_errors : list = []
 
-    if status != None:
-        raise PlaylistDoesntExistException()
+    cookies_given : bool = ytlp_command.find("--cookies-from-browser") != -1
+    age_restr_message = "Sign in to confirm your age. This video may be inappropriate for some users."
+    id_pattern : str = "[A-Za-z0-9_-]{10}[AEIMQUYcgkosw048]"
+    
+    for line in iter(command.stdout.readline, ""):
+        if line.startswith("ERROR"):
+            is_age_restr_error : bool = line.find(age_restr_message) != -1
+            print(Fore.RED + line[0:6], end="")
+            print(Style.RESET_ALL + line[6:], end="")
 
-    unpr_playlist_json : dict = json.loads(
-        "[" + unpr_playlist_string.replace("}", "},", unpr_playlist_string.count("}") - 1) + "]"
-    )
-    return unpr_playlist_json
+            print("\nis_age_restr_error: " + str(is_age_restr_error))
+            print("cookies_given: " + str(cookies_given))
+            if is_age_restr_error and cookies_given:
+                age_restr_errors.append(re.search(id_pattern, line).group())
+        else:
+            print(line, end="")
+            output += (line)
+
+    return (output, age_restr_errors)
 
 def get_one_unprocessed_video_json_from_youtube(video_id : str) -> dict:
     video_url : str = "https://www.youtube.com/watch?v={}".format(video_id)
@@ -105,11 +139,15 @@ def main():
         command += " --sleep-requests {}".format(args.sleep)
 
     try:
-        unpr_playlist_json : dict = get_unprocessed_playlist_json_from_youtube(ytlp_command=command)
+        unpr_playlist, errors = get_unprocessed_playlist_json_from_youtube(ytlp_command=command)
+        print("\n")
+        print(unpr_playlist)
+        print("\n")
+        print(errors)
     except PlaylistDoesntExistException as error:
         print(error)
         sys.exit(1)
-    pr_playlist_string : str = process_playlist_data(unpr_playlist_json)
-    print("\n" + pr_playlist_string)
+    # pr_playlist_string : str = process_playlist_data(unpr_playlist_json)
+    # print("\n" + pr_playlist_string)
 
 main()
