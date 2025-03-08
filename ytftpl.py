@@ -15,15 +15,18 @@ class PlaylistDoesntExistException(Exception):
         super().__init__("\nYT-DLP Error. If you are trying to transfer a private playlist you have access to, provide cookies to the script.")
 
 def initialize_parser() -> argparse.ArgumentParser:
+    """Creates and returns the command line argument parser."""
     parser = argparse.ArgumentParser(
         description="This is a small Python script that transfers YouTube playlists to FreeTube.",
         add_help=True
     )
+    # Positional Argument
     parser.add_argument(
         "playlist_url",
         help="Full URL of the playlist you want to transfer",
         type=str
     )
+    # Optional
     parser.add_argument(
         "-c", "--browser-cookies",
         help="Use cookies from the specified browser for private playlists or age-restricted videos",
@@ -31,6 +34,7 @@ def initialize_parser() -> argparse.ArgumentParser:
         required=False,
         metavar="NAME OF BROWSER"
     )
+    # Optional
     parser.add_argument(
         "-s", "--sleep",help="Time in seconds to sleep between videos. Can be used to combat rate limiting for longer playlists, e.g. a value of 5",
         type=int,
@@ -40,6 +44,11 @@ def initialize_parser() -> argparse.ArgumentParser:
     return parser
 
 def get_unprocessed_playlist_json_from_youtube(ytlp_command : str) -> tuple:
+    """
+    Opens yt-dlp and returns a JSON string containing the data as well as
+    a list of video IDs which failed to be extracted due to age-restriction
+    despite the user passing cookies to the program.
+    """
     command = Popen(ytlp_command, shell=True, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
     
     output : str = ""
@@ -65,33 +74,34 @@ def get_unprocessed_playlist_json_from_youtube(ytlp_command : str) -> tuple:
 
     return (output, age_restr_errors)
 
-def get_one_unprocessed_video_json_from_youtube(video_id : str) -> dict:
+def get_unprocessed_video_json_from_youtube(video_id : str) -> dict:
+    """Executes a yt-dlp command for a single video and returns the data."""
     video_url : str = "https://www.youtube.com/watch?v={}".format(video_id)
-    unpr_video_string : str = os.popen(
+    output : str = os.popen(
         "yt-dlp --cookies-from-browser firefox --quiet --no-warnings --skip-download --ignore-errors --print '%(.{id,title,channel,channel_id,duration,timestamp})#j' '" + video_url + "'"
     ).read()
-    unpr_video_json : dict = json.loads(unpr_video_string)
-    return unpr_video_json
+    return json.loads(output)
 
 def process_playlist_data(unpr_playlist_json : dict) -> str:
-    pr_playlist_json : dict = {
+    """Takes the yt-dlp JSON playlist data and converts it to the right format for FreeTube."""
+    finished_data : dict = {
         "playlistName": unpr_playlist_json[0]["playlist_title"],
         "protected": False,
         "description": "",
     }
     pr_videos_json : list = []
-    for unpr_video_json in unpr_playlist_json:
-        pr_video = process_singular_video_data(unpr_video_json)
+    for video in unpr_playlist_json:
+        pr_video = process_video_data(video)
         pr_videos_json.append(pr_video)
-    pr_playlist_json["videos"] = pr_videos_json
-    pr_playlist_json["_id"] = "ft-playlist--" + str(uuid4())
-    pr_playlist_json["createdAt"] = int(time())
-    pr_playlist_json["lastUpdatedAt"] = int(time())
+    finished_data["videos"] = pr_videos_json
+    finished_data["_id"] = "ft-playlist--" + str(uuid4())
+    finished_data["createdAt"] = int(time())
+    finished_data["lastUpdatedAt"] = int(time())
 
-    processed_json_string = json.dumps(pr_playlist_json)
-    return processed_json_string
+    return json.dumps(finished_data)
 
-def process_singular_video_data(unpr_video_json : dict) -> dict:
+def process_video_data(unpr_video_json : dict) -> dict:
+    """Takes a video JSON object and converts it to the right format for FreeTube."""
     return {
         "videoId": unpr_video_json["id"],
         "title": unpr_video_json["title"],
@@ -105,6 +115,7 @@ def process_singular_video_data(unpr_video_json : dict) -> dict:
     }
 
 def append_to_playlist_dot_db(data : str):
+    """Will make an attempt to append the processed data to FreeTube's playlist database."""
     home_path : str = os.path.expanduser("~")
     playlist_database_path : str = ""
 
@@ -129,6 +140,8 @@ def append_to_playlist_dot_db(data : str):
         print("\nThe path {} was NOT FOUND. Check if it's there, open FreeTube if you haven't.".format(playlist_database_path))
 
 def main():
+    """Entrypoint for the script."""
+    init()  # Initialize colorama
     parser = initialize_parser()
     args = parser.parse_args()
 
