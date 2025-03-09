@@ -136,18 +136,20 @@ def append_to_playlist_dot_db(data : str):
     """Will make an attempt to append the processed data to FreeTube's playlist database."""
     home_path : str = os.path.expanduser("~")
     playlist_database_path : str = ""
+    database_name = "playlists.db"
 
     if sys.platform == "windows":
-        playlist_database_path = os.getenv("APPDATA") + "\\FreeTube\\playlists.db"
+        playlist_database_path = os.getenv("APPDATA") + "\\FreeTube\\" + database_name
     elif sys.platform == "linux":
         # If FreeTube is installied via FlatPak
         if os.path.exists(home_path + "/.var/app/io.freetubeapp.FreeTube/config/FreeTube/"):
-            playlist_database_path = home_path + "/.var/app/io.freetubeapp.FreeTube/config/FreeTube/playlists.db"
+            playlist_database_path = home_path + "/.var/app/io.freetubeapp.FreeTube/config/FreeTube/" + database_name
         else:
-            # playlist_database_path = home_path + "/.config/FreeTube/playlistssss.db"
-            sys.exit(0)
+            playlist_database_path = home_path + "/.config/FreeTube/" + database_name
     elif sys.platform == "darwin":
-        playlist_database_path = home_path + "/Library/Application Support/FreeTube/playlists.db"
+        playlist_database_path = home_path + "/Library/Application Support/FreeTube/" + database_name
+
+    print("PATH: " + playlist_database_path)
 
     if os.path.exists(playlist_database_path):
         # Append new playlist to existing database
@@ -163,19 +165,25 @@ def main():
     parser = initialize_parser()
     args = parser.parse_args()
 
+    # Get unprocessed playlist data including video IDs with an age-restriction error
     try:
         unpr_playlist, errors = get_unprocessed_playlist_json_from_yt(cli_args=args)
     except PlaylistDoesntExistException as error:
         print(error)
         sys.exit(1)
     
+    # Get the playlist in the correct format for FreeTube
     print("\n\nErrors: " + str(errors) + "\n\n")
     pr_playlist : dict = process_playlist_data(unpr_playlist)
     
+    # Loop through each age-restricted video and add them to the videos list of the playlist
     for error in errors:
         age_restricted_video : dict = process_video_data(get_unprocessed_video_json_from_yt(video_id=error))
         pr_playlist["videos"].append(age_restricted_video)
 
     print(pr_playlist)
+
+    # Attempt to append the data to the user's existing playlists.db file
+    append_to_playlist_dot_db(json.dumps(pr_playlist))
 
 main()
