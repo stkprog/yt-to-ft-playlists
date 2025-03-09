@@ -47,27 +47,33 @@ def initialize_parser() -> argparse.ArgumentParser:
     )
     return parser
 
-def get_unprocessed_playlist_json_from_youtube(ytlp_command : str) -> tuple:
+def get_unprocessed_playlist_json_from_yt(cli_args : argparse.Namespace) -> tuple:
     """
     Opens yt-dlp and returns a JSON string containing the data as well as
     a list of video IDs which failed to be extracted due to age-restriction
     despite the user passing cookies to the program.
     """
-    command = Popen(ytlp_command, shell=True, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
+    ytdlp_command : str = "yt-dlp '" + cli_args.playlist_url + "' --quiet --no-warnings --skip-download --ignore-errors --print '%(.{playlist_title,id,title,channel,channel_id,duration,timestamp})#j'"
+    if cli_args.browser_cookies is not None:
+        ytdlp_command += " --cookies-from-browser {}".format(cli_args.browser_cookies)
+    if cli_args.sleep is not None:
+        ytdlp_command += " --sleep-requests {}".format(cli_args.sleep)
+
+    popen = Popen(ytdlp_command, shell=True, stdout=PIPE, stderr=STDOUT, universal_newlines=True)
     
     output : str = ""
     age_restr_errors : list = []
 
-    cookies_given : bool = ytlp_command.find("--cookies-from-browser") != -1
+    cookies_given : bool = ytdlp_command.find("--cookies-from-browser") != -1
     age_restr_message = "Sign in to confirm your age. This video may be inappropriate for some users."
     id_pattern : str = "[A-Za-z0-9_-]{10}[AEIMQUYcgkosw048]"
 
-    first_line = command.stdout.readline()
+    first_line = popen.stdout.readline()
     if first_line.find("YouTube said: The playlist does not exist.") != -1:
         print_colorful_error(first_line)
         raise PlaylistDoesntExistException()
 
-    for line in command.stdout:
+    for line in popen.stdout:
         if line.startswith("ERROR"):
             is_age_restr_error : bool = line.find(age_restr_message) != -1
             print_colorful_error(line)
@@ -78,17 +84,23 @@ def get_unprocessed_playlist_json_from_youtube(ytlp_command : str) -> tuple:
             print(line, end="")
             output += line
 
-    return (output, age_restr_errors)
+    output = "[{" + output.replace("}", "},", output.count("}") - 1) + "]"
+    output_dict = json.loads(output)
 
-def get_unprocessed_video_json_from_youtube(video_id : str) -> dict:
+    return (output_dict, age_restr_errors)
+
+def get_unprocessed_video_json_from_yt(video_id : str, browser : str, sleep : int) -> dict:
     """Executes a yt-dlp command for a single video and returns the data."""
     video_url : str = "https://www.youtube.com/watch?v={}".format(video_id)
-    output : str = os.popen(
-        "yt-dlp --cookies-from-browser firefox --quiet --no-warnings --skip-download --ignore-errors --print '%(.{id,title,channel,channel_id,duration,timestamp})#j' '" + video_url + "'"
-    ).read()
+    ytdlp_command : str = "yt-dlp '" + video_url + "' --quiet --no-warnings --skip-download --ignore-errors --print '%(.{id,title,channel,channel_id,duration,timestamp})#j' --cookies-from-browser " + browser
+    if sleep is not None:
+        ytdlp_command += " --sleep-requests {}".format(sleep)
+
+    output : str = os.popen(ytdlp_command).read()
+    print(output)
     return json.loads(output)
 
-def process_playlist_data(unpr_playlist_json : dict) -> str:
+def process_playlist_data(unpr_playlist_json : dict) -> dict:
     """Takes the yt-dlp JSON playlist data and converts it to the right format for FreeTube."""
     finished_data : dict = {
         "playlistName": unpr_playlist_json[0]["playlist_title"],
@@ -97,14 +109,14 @@ def process_playlist_data(unpr_playlist_json : dict) -> str:
     }
     pr_videos_json : list = []
     for video in unpr_playlist_json:
-        pr_video = process_video_data(video)
+        pr_video : dict = process_video_data(video)
         pr_videos_json.append(pr_video)
     finished_data["videos"] = pr_videos_json
     finished_data["_id"] = "ft-playlist--" + str(uuid4())
     finished_data["createdAt"] = int(time())
     finished_data["lastUpdatedAt"] = int(time())
 
-    return json.dumps(finished_data)
+    return finished_data
 
 def process_video_data(unpr_video_json : dict) -> dict:
     """Takes a video JSON object and converts it to the right format for FreeTube."""
@@ -151,19 +163,19 @@ def main():
     parser = initialize_parser()
     args = parser.parse_args()
 
-    command : str = "yt-dlp '" + args.playlist_url + "' --quiet --no-warnings --skip-download --ignore-errors --print '%(.{playlist_title,id,title,channel,channel_id,duration,timestamp})#j'"
-    if args.browser_cookies is not None:
-        command += " --cookies-from-browser {}".format(args.browser_cookies)
-    if args.sleep is not None:
-        command += " --sleep-requests {}".format(args.sleep)
-
     try:
-        unpr_playlist, errors = get_unprocessed_playlist_json_from_youtube(ytlp_command=command)
+        unpr_playlist, errors = get_unprocessed_playlist_json_from_yt(cli_args=args)
     except PlaylistDoesntExistException as error:
         print(error)
         sys.exit(1)
     
-    # pr_playlist_string : str = process_playlist_data(unpr_playlist_json)
-    # print("\n" + pr_playlist_string)
+    print("\n\nErrors: " + str(errors) + "\n\n")
+    pr_playlist : dict = process_playlist_data(unpr_playlist)
+    
+    for error in errors:
+        age_restricted_video : dict = process_video_data(get_unprocessed_video_json_from_yt(video_id=error))
+        pr_playlist["videos"].append(age_restricted_video)
+
+    print(pr_playlist)
 
 main()
