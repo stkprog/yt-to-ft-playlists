@@ -178,7 +178,9 @@ def main():
     
     # Loop through each age-restricted video and add them to the videos list of the playlist
     for error in errors:
-        age_restricted_video : dict = process_video_data(get_unprocessed_video_json_from_yt(video_id=error))
+        age_restricted_video : dict = process_video_data(
+            get_unprocessed_video_json_from_yt(video_id=error, browser=args.browser_cookies, sleep=args.sleep)
+        )
         pr_playlist["videos"].append(age_restricted_video)
 
     print(pr_playlist)
