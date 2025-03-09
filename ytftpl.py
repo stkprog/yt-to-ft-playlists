@@ -113,8 +113,8 @@ def process_playlist_data(unpr_playlist_json : dict) -> dict:
         pr_videos_json.append(pr_video)
     finished_data["videos"] = pr_videos_json
     finished_data["_id"] = "ft-playlist--" + str(uuid4())
-    finished_data["createdAt"] = int(time())
-    finished_data["lastUpdatedAt"] = int(time())
+    finished_data["createdAt"] = int(round(time() * 1000))
+    finished_data["lastUpdatedAt"] = int(round(time() * 1000))
 
     return finished_data
 
@@ -127,7 +127,7 @@ def process_video_data(unpr_video_json : dict) -> dict:
         "authorId": unpr_video_json["channel_id"],
         "lengthSeconds": unpr_video_json["duration"],
         "published": unpr_video_json["timestamp"],
-        "timeAdded": int(time()),
+        "timeAdded": int(round(time() * 1000)),
         "playlistItemId": str(uuid4()),
         "type": "video"
     }
