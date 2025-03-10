@@ -129,9 +129,13 @@ def get_unprocessed_playlist_json_from_yt(cli_args : argparse.Namespace) -> tupl
                 color=Fore.RED
             )
             raise UnsupportedBrowserError()
+        # Don't print in case of an error that shows yt-dlp's CLI help
+        elif line.startswith("Usage") or line.startswith("\n"):
+            pass
         # Error-less line, add to output
         else:
-            print(line, end="")
+            if not (cli_args.quiet or cli_args.silent):
+                print(line, end="")
             output += line
 
     output = "[{" + output.replace("}", "},", output.count("}") - 1) + "]"
@@ -182,7 +186,7 @@ def process_video_data(unpr_video_json : dict) -> dict:
         "type": "video"
     }
 
-def append_to_playlist_dot_db(data : str, user_specified_path : str = None):
+def append_to_playlist_dot_db(data : str, user_specified_path : str = None) -> None:
     """Will make an attempt to append the processed data to FreeTube's playlist database."""
     
     playlist_database_path : str = ""
@@ -214,7 +218,7 @@ def append_to_playlist_dot_db(data : str, user_specified_path : str = None):
         with open(playlist_database_path, "a") as playlist_database_file:
             playlist_database_file.write(data)
 
-def main():
+def main() -> None:
     """Entrypoint for the script."""
     init()  # Initialize colorama
     parser = initialize_parser()
@@ -239,7 +243,6 @@ def main():
         sys.exit(1)
     
     # Get the playlist in the correct format for FreeTube
-    print("\n\nErrors: " + str(errors) + "\n\n")
     pr_playlist : dict = process_playlist_data(unpr_playlist)
     
     # Loop through each age-restricted video and add them to the videos list of the playlist
@@ -249,7 +252,8 @@ def main():
         )
         pr_playlist["videos"].append(age_restricted_video)
 
-    print(pr_playlist)
+    if not args.silent:
+        print(pr_playlist)
 
     # Attempt to append the data to the user's existing playlists.db file
     try:
