@@ -1,4 +1,4 @@
-from colorama import init, Fore, Style      # Colored text
+from colorama import init, Fore             # Colored text
 from subprocess import Popen, PIPE, STDOUT  # Opening yt-dlp
 from uuid import uuid4  # Getting version 4 uuids
 from time import time   # Getting current UNIX timestamp
@@ -8,27 +8,50 @@ import os               # Path opening and such
 import sys              # Check which OS, exit
 import argparse         # Clean CLI
 
-class PlaylistDoesntExistException(Exception):
+class PlaylistDoesntExistError(Exception):
     """Playlist either does not exist or can't be found because it is private."""
+    pass
 
-    def __init__(self):
-        super().__init__("YT-DLP Error. If you are trying to transfer a private playlist you have access to, provide cookies to the script.")
+class UnsupportedBrowserError(Exception):
+    """The user specified a browser with the -c option that yt-dlp does not support."""
+    pass
 
-def print_colorful_error(error_message : str) -> None:
-    print(Fore.RED + error_message[0:6], end="")
-    print(Style.RESET_ALL + error_message[6:], end="")
+class PlaylistDatabaseNotFoundError(Exception):
+    """playlists.db cannot be found on the user's hard drive."""
+
+    def __init__(self, database_path : str):
+        super().__init__("")
+        self.database_path = database_path
+
+def print_colorful_message(message_color : str, message_white : str, color : str) -> None:
+    """Colorful output for error or success messages."""
+    print(color + message_color, end="")
+    print(Fore.RESET + message_white)
 
 def initialize_parser() -> argparse.ArgumentParser:
     """Creates and returns the command line argument parser."""
+    # Initialize parser with a help option & nice formatting
     parser = argparse.ArgumentParser(
         description="This is a small Python script that transfers YouTube playlists to FreeTube.",
-        add_help=True
+        add_help=True,
+        formatter_class=lambda prog: argparse.RawDescriptionHelpFormatter(prog="PROG", indent_increment=4, max_help_position=48, width=None)
     )
     # Positional Argument
     parser.add_argument(
         "playlist_url",
         help="Full URL of the playlist you want to transfer",
         type=str
+    )
+    # Flag
+    parser.add_argument(
+        "-q", "--quiet",
+        help="Only output JSON at the end, don't show each video as it is being extracted",
+        action="store_true"
+    )
+    parser.add_argument(
+        "-i", "--silent",
+        help="Only output ytftpl's error or success messages",
+        action="store_true"
     )
     # Optional
     parser.add_argument(
@@ -40,10 +63,19 @@ def initialize_parser() -> argparse.ArgumentParser:
     )
     # Optional
     parser.add_argument(
-        "-s", "--sleep",help="Time in seconds to sleep between videos. Can be used to combat rate limiting for longer playlists, e.g. a value of 5",
+        "-s", "--sleep",
+        help="Time in seconds to sleep between videos. Can be used to combat rate limiting for longer playlists, e.g. a value of 5",
         type=int,
         required=False,
         metavar="SLEEP SECONDS"
+    )
+    # Optional
+    parser.add_argument(
+        "-p", "--path",
+        help="Absolute path to playlists.db if it is not in the usual location",
+        type=str,
+        required=False,
+        metavar="DB PATH"
     )
     return parser
 
@@ -70,16 +102,34 @@ def get_unprocessed_playlist_json_from_yt(cli_args : argparse.Namespace) -> tupl
 
     first_line = popen.stdout.readline()
     if first_line.find("YouTube said: The playlist does not exist.") != -1:
-        print_colorful_error(first_line)
-        raise PlaylistDoesntExistException()
+        print_colorful_message(
+            message_color=first_line[0:6], 
+            message_white=first_line[6:],
+            color=Fore.RED
+        )
+        raise PlaylistDoesntExistError()
 
     for line in popen.stdout:
+        # Error, usually regarding a video, simply output these
         if line.startswith("ERROR"):
             is_age_restr_error : bool = line.find(age_restr_message) != -1
-            print_colorful_error(line)
+            print_colorful_message(
+                message_color=line[0:6],
+                message_white=line[6:],
+                color=Fore.RED
+            )
 
             if is_age_restr_error and cookies_given:
                 age_restr_errors.append(re.search(id_pattern, line).group())
+        # Unsupported browser, yt-dlp help message gets output
+        elif line.find("unsupported browser specified for cookies") != -1:
+            print_colorful_message(
+                message_color=line[0:7],
+                message_white=line[7:],
+                color=Fore.RED
+            )
+            raise UnsupportedBrowserError()
+        # Error-less line, add to output
         else:
             print(line, end="")
             output += line
@@ -132,32 +182,37 @@ def process_video_data(unpr_video_json : dict) -> dict:
         "type": "video"
     }
 
-def append_to_playlist_dot_db(data : str):
+def append_to_playlist_dot_db(data : str, user_specified_path : str = None):
     """Will make an attempt to append the processed data to FreeTube's playlist database."""
-    home_path : str = os.path.expanduser("~")
+    
     playlist_database_path : str = ""
-    database_name = "playlists.db"
+    database_name : str = "playlists.db"
 
-    if sys.platform == "windows":
-        playlist_database_path = os.getenv("APPDATA") + "\\FreeTube\\" + database_name
-    elif sys.platform == "linux":
-        # If FreeTube is installied via FlatPak
-        if os.path.exists(home_path + "/.var/app/io.freetubeapp.FreeTube/config/FreeTube/"):
-            playlist_database_path = home_path + "/.var/app/io.freetubeapp.FreeTube/config/FreeTube/" + database_name
-        else:
-            playlist_database_path = home_path + "/.config/FreeTube/" + database_name
-    elif sys.platform == "darwin":
-        playlist_database_path = home_path + "/Library/Application Support/FreeTube/" + database_name
+    if user_specified_path is None:
+        home_path : str = os.path.expanduser("~")
 
-    print("PATH: " + playlist_database_path)
+        if sys.platform == "windows":
+            playlist_database_path = os.path.join(os.getenv("APPDATA"), "FreeTube")
+        elif sys.platform == "linux":
+            # If FreeTube is installied via FlatPak
+            if os.path.exists(os.path.join(home_path, ".var/app/io.freetubeapp.FreeTube/config/FreeTube")):
+                playlist_database_path = os.path.join(home_path, ".var/app/io.freetubeapp.FreeTube/config/FreeTube")
+            else:
+                playlist_database_path = os.path.join(home_path, ".config/FreeTube")
+        elif sys.platform == "darwin":
+            playlist_database_path = os.path.join(home_path, "Library/Application Support/FreeTube")
+        playlist_database_path = os.path.join(playlist_database_path, database_name)
+    else:
+        playlist_database_path = user_specified_path
+        if user_specified_path.find("playlists.db") == -1:
+            playlist_database_path = os.path.join(user_specified_path, database_name)
 
-    if os.path.exists(playlist_database_path):
+    if not os.path.exists(playlist_database_path):
+        raise PlaylistDatabaseNotFoundError(playlist_database_path)
+    else:
         # Append new playlist to existing database
         with open(playlist_database_path, "a") as playlist_database_file:
             playlist_database_file.write(data)
-        print("\nPlaylist successfully added to {}.".format(playlist_database_path))
-    else:
-        print("\nThe path {} was NOT FOUND. Check if it's there, open FreeTube if you haven't.".format(playlist_database_path))
 
 def main():
     """Entrypoint for the script."""
@@ -168,8 +223,19 @@ def main():
     # Get unprocessed playlist data including video IDs with an age-restriction error
     try:
         unpr_playlist, errors = get_unprocessed_playlist_json_from_yt(cli_args=args)
-    except PlaylistDoesntExistException as error:
-        print(error)
+    except PlaylistDoesntExistError as e:
+        print_colorful_message(
+            message_color="ytftpl - " + e.__class__.__name__ + ": ",
+            message_white="Playlist either doesn't exist or you are trying to access a private playlist without cookies.",
+            color=Fore.YELLOW
+        )
+        sys.exit(1)
+    except UnsupportedBrowserError as e:
+        print_colorful_message(
+            message_color="ytftpl - " + e.__class__.__name__ + ": ",
+            message_white="Unsupported browser specified in -c / --browser-cookies flag.",
+            color=Fore.YELLOW
+        )
         sys.exit(1)
     
     # Get the playlist in the correct format for FreeTube
@@ -186,6 +252,21 @@ def main():
     print(pr_playlist)
 
     # Attempt to append the data to the user's existing playlists.db file
-    append_to_playlist_dot_db(json.dumps(pr_playlist))
+    try:
+        append_to_playlist_dot_db(json.dumps(pr_playlist), args.path)
+    except PlaylistDatabaseNotFoundError as e:
+        print_colorful_message(
+            message_color="ytftpl - " + e.__class__.__name__ + ": ",
+            message_white="The path '" + e.database_path + "' couldn't be found.",
+            color=Fore.YELLOW
+        )
+        sys.exit(1)
+
+    # Done :)
+    print_colorful_message(
+        message_color="ytftpl: ",
+        message_white="Playlist '" + pr_playlist["playlistName"] + "' successfully added to FreeTube!",
+        color=Fore.GREEN
+    )
 
 main()
