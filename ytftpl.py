@@ -34,7 +34,7 @@ def initialize_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="This is a small Python script that transfers YouTube playlists to FreeTube.",
         add_help=True,
-        formatter_class=lambda prog: argparse.RawDescriptionHelpFormatter(prog="PROG", indent_increment=4, max_help_position=48, width=None)
+        formatter_class=lambda prog: argparse.RawDescriptionHelpFormatter(prog="ytftpl.py", indent_increment=4, max_help_position=48, width=None)
     )
     # Positional Argument
     parser.add_argument(
@@ -48,6 +48,7 @@ def initialize_parser() -> argparse.ArgumentParser:
         help="Only output JSON at the end, don't show each video as it is being extracted",
         action="store_true"
     )
+    # Flag
     parser.add_argument(
         "-i", "--silent",
         help="Only output ytftpl's error or success messages",

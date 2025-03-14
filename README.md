@@ -12,18 +12,32 @@ This is a small Python script that transfers YouTube playlists to [FreeTube](htt
 - [Technical Details](#technical-details)
 
 ## Usage
-Make sure _FreeTube_ is _closed_ before running the script.
+Make sure _FreeTube_ is _closed_ and backup your ``playlists.db`` file before running the script.
+ 
 ```
-Python3 ytftpl.py "[YOUR PLAYLIST URL]"
+ytftpl.py [-h] [-q] [-i] [-c NAME OF BROWSER] [-s SLEEP SECONDS] [-p DB PATH] playlist_url
+
+This is a small Python script that transfers YouTube playlists to FreeTube.
+
+positional arguments:
+    playlist_url                           Full URL of the playlist you want to transfer
+
+options:
+    -h, --help                             show this help message and exit
+    -q, --quiet                            Only output JSON at the end, don't show each video as it is being extracted
+    -i, --silent                           Only output ytftpl's error or success messages
+    -c, --browser-cookies NAME OF BROWSER  Use cookies from the specified browser for private playlists or age-restricted videos
+    -s, --sleep SLEEP SECONDS              Time in seconds to sleep between videos. Can be used to combat rate limiting for longer playlists, e.g. a value of 5
+    -p, --path DB PATH                     Absolute path to playlists.db if it is not in the usual location
 ```
 
 Example:
 ```
-python3 ytftpl.py "https://www.youtube.com/playlist?list=PLmXxqSJJq-yUvMWKuZQAB_8yxnjZaOZUp"
+python3 ytftpl.py -c firefox -s 5 "https://www.youtube.com/playlist?list=PLmXxqSJJq-yUvMWKuZQAB_8yxnjZaOZUp"
 ```
 
 ## Result
-If everything goes correctly, the program outputs the processed playlist data to the console for easy copying if needed, and then attempts to append the playlist to _FreeTube's_ ``playlists.db`` file. Errors are output to console, including the affected YouTube video IDs.
+If everything goes correctly, the program outputs the processed playlist data to the console for easy copying (if ``--silent`` is _not_ specified), and then attempts to append the playlist to _FreeTube's_ ``playlists.db`` file. Errors are output to console, including the affected YouTube video IDs.
 
 ## Requirements
 [Python](https://www.Python.org/downloads/) and [yt-dlp](https://github.com/yt-dlp/yt-dlp) are required to run the source code.  
@@ -60,7 +74,7 @@ ERROR: [youtube] [VIDEO ID]: Join this channel to get access to members-only con
 ERROR: [youtube] [VIDEO ID]: Private video. Sign in if you've been granted access to this video. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
 ```
 
-I've found that when exporting a larger playlist (e.g. around 150 videos), age-restricted videos may give you **Error 1** despite passing cookies to _yt-dlp_ and being able to work through the rest of even a private playlist without problem. As of now, I do not know how to resolve this issue.
+I've found that when exporting a larger playlist (e.g. around 150 videos), age-restricted videos may give you **Error 1** despite passing cookies to _yt-dlp_ and being able to work through the rest of even a private playlist without problem. To solve this problem, I wrote the program so it would check when these age-restriction errors happen, save the affected video IDs in an array, and then open ``yt-dlp`` again for each of these IDs and get the data that way.
 
 ## Technical Details
 _FreeTube_ uses a NPM module called [nedb](https://www.npmjs.com/package/@seald-io/nedb) to save data locally, including the user's playlists. They are stored in a file called ``playlists.db`` in a JSON-like format in one of the following locations, according to the [FreeTube documentation](https://docs.freetubeapp.io/usage/data-location/):
