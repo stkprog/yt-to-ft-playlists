@@ -63,7 +63,7 @@ ERROR: [youtube] [VIDEO ID]: Video unavailable. This video is not available
 ```
 
 ### Missing user authentication
-When attempting to access age-restricted videos (**Error 1**), your own private playlist (**Error 2**), or other videos that are only available when authenticated (**Errors 3 and 4**), you may need to pass cookies to ``ytftpl.py`` in order to make it work. See [Usage](#usage) and the [yt-dlp]([text](https://www.youtube.com/playlist?list=WL)) documentation for more information.
+When attempting to access age-restricted videos (**Error 1**), your own private playlist (**Error 2**), or other videos that are only available when authenticated (**Errors 3 and 4**), you may need to pass cookies to ``ytftpl.py`` in order to make it work. See [Usage](#usage) and the [yt-dlp](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) documentation for more information.
 ```
 ERROR: [youtube] [VIDEO ID]: Sign in to confirm your age. This video may be inappropriate for some users. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
 
