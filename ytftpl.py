@@ -97,7 +97,7 @@ def get_unprocessed_playlist_json_from_yt(cli_args : argparse.Namespace) -> tupl
     output : str = ""
     age_restr_errors : list = []
 
-    cookies_given : bool = ytdlp_command.find("--cookies-from-browser") != -1
+    cookies_given : bool = cli_args.browser_cookies is not None
     age_restr_message = "Sign in to confirm your age. This video may be inappropriate for some users."
     id_pattern : str = "[A-Za-z0-9_-]{10}[AEIMQUYcgkosw048]"
 
