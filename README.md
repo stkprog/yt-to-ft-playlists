@@ -12,7 +12,7 @@ This is a small Python script that transfers YouTube playlists to [FreeTube](htt
 - [Technical Details](#technical-details)
 
 > [!CAUTION]
-> This script adds data to _playlists.db_ using simple appending of JSON text in Python. It seems like doing this causes issues with FreeTube's _nedb_ database and can result in FreeTube not opening the database correctly anymore. nedb checks for corruption while loading the database into code, with each corrupted line adding to a 10% total threshold of corruption. If this threshold is passed, nedb refuses to open the file. As of now, this has not been solved.
+> This script adds data to _playlists.db_ using simple appending of JSON text in Python. It seems like doing this causes issues with FreeTube's _nedb_ database and can result in FreeTube not opening the database correctly anymore. nedb checks for corruption while loading the database into code, with each corrupted line adding to a 10% total threshold of corruption. If this threshold is passed, nedb refuses to open the file. As of now, this has not been solved. See [Issue 10](https://github.com/stkprog/yt-to-ft-playlists/issues/10) for more info.
 
 ## Usage
 Make sure _FreeTube_ is _closed_ and backup your ``playlists.db`` file before running the script.
