@@ -114,11 +114,13 @@ def get_unprocessed_playlist_json_from_yt(cli_args : argparse.Namespace) -> tupl
         # Error, usually regarding a video, simply output these
         if line.startswith("ERROR"):
             is_age_restr_error : bool = line.find(age_restr_message) != -1
-            print_colorful_message(
-                message_color=line[0:6],
-                message_white=line[6:],
-                color=Fore.RED
-            )
+
+            if not (cli_args.quiet or cli_args.silent):
+                print_colorful_message(
+                    message_color=line[0:6],
+                    message_white=line[6:],
+                    color=Fore.RED
+                )
 
             if is_age_restr_error and cookies_given:
                 age_restr_errors.append(re.search(id_pattern, line).group())
@@ -152,7 +154,6 @@ def get_unprocessed_video_json_from_yt(video_id : str, browser : str, sleep : in
         ytdlp_command += " --sleep-requests {}".format(sleep)
 
     output : str = os.popen(ytdlp_command).read()
-    print(output)
     return json.loads(output)
 
 def process_playlist_data(unpr_playlist_json : dict) -> dict:
@@ -176,18 +177,18 @@ def process_playlist_data(unpr_playlist_json : dict) -> dict:
 def process_video_data(unpr_video_json : dict) -> dict:
     """Takes a video JSON object and converts it to the right format for FreeTube."""
     return {
-        "videoId": unpr_video_json["id"],
-        "title": unpr_video_json["title"],
-        "author": unpr_video_json["channel"],
-        "authorId": unpr_video_json["channel_id"],
-        "lengthSeconds": unpr_video_json["duration"],
-        "published": unpr_video_json["timestamp"],
+        "videoId": unpr_video_json["id"] if "id" in unpr_video_json else "N/A",
+        "title": unpr_video_json["title"] if "title" in unpr_video_json else "N/A",
+        "author": unpr_video_json["channel"] if "channel" in unpr_video_json else "N/A",
+        "authorId": unpr_video_json["channel_id"] if "channel_id" in unpr_video_json else "N/A",
+        "lengthSeconds": unpr_video_json["duration"] if "duration" in unpr_video_json else 0,
+        "published": unpr_video_json["timestamp"] if "timestamp" in unpr_video_json else 0,
         "timeAdded": int(round(time() * 1000)),
         "playlistItemId": str(uuid4()),
         "type": "video"
     }
 
-def append_to_playlist_dot_db(data : str, user_specified_path : str = None) -> None:
+def append_to_playlist_dot_db(data : dict, user_specified_path : str = None) -> None:
     """Will make an attempt to append the processed data to FreeTube's playlist database."""
     
     playlist_database_path : str = ""
@@ -217,7 +218,9 @@ def append_to_playlist_dot_db(data : str, user_specified_path : str = None) -> N
     else:
         # Append new playlist to existing database
         with open(playlist_database_path, "a") as playlist_database_file:
-            playlist_database_file.write(data)
+            # playlist_database_file.write(data)
+            json.dump(data, playlist_database_file, indent=None, separators=(',', ':'))
+            playlist_database_file.write("\n")
 
 def main() -> None:
     """Entrypoint for the script."""
@@ -243,6 +246,8 @@ def main() -> None:
         )
         sys.exit(1)
     
+    print("Errors: " + str(errors))
+
     # Get the playlist in the correct format for FreeTube
     pr_playlist : dict = process_playlist_data(unpr_playlist)
     
@@ -253,12 +258,13 @@ def main() -> None:
         )
         pr_playlist["videos"].append(age_restricted_video)
 
+    print()
     if not args.silent:
-        print(pr_playlist)
+        print(json.dumps(pr_playlist, indent=None, separators=(',', ':')) + "\n")
 
     # Attempt to append the data to the user's existing playlists.db file
     try:
-        append_to_playlist_dot_db(json.dumps(pr_playlist), args.path)
+        append_to_playlist_dot_db(pr_playlist, args.path)
     except PlaylistDatabaseNotFoundError as e:
         print_colorful_message(
             message_color="ytftpl - " + e.__class__.__name__ + ": ",
