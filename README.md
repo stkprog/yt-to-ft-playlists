@@ -8,6 +8,7 @@ This is a small Python script that transfers YouTube playlists to [FreeTube](htt
 - [Requirements](#requirements)
 - [Possible Errors and Issues](#possible-errors-and-issues)
     - [Unavailable videos](#unavailable-videos)
+    - [Long playlists](#long-playlists)
     - [Missing user authentication](#missing-user-authentication)
 - [Technical Details](#technical-details)
 
@@ -15,7 +16,7 @@ This is a small Python script that transfers YouTube playlists to [FreeTube](htt
 > This script adds data to _playlists.db_ using simple appending of JSON text in Python. It seems like doing this causes issues with FreeTube's _nedb_ database and can result in FreeTube not opening the database correctly anymore. nedb checks for corruption while loading the database into code, with each corrupted line adding to a 10% total threshold of corruption. If this threshold is passed, nedb refuses to open the file. As of now, this has not been solved. See [Issue 10](https://github.com/stkprog/yt-to-ft-playlists/issues/10) for more info.
 
 ## Usage
-Make sure _FreeTube_ is _closed_ and backup your ``playlists.db`` file before running the script.
+Make sure that _FreeTube_ is closed, none of its processes are running and backup your ``playlists.db`` file before running the script.
  
 ```
 ytftpl.py [-h] [-q] [-i] [-c NAME OF BROWSER] [-s SLEEP SECONDS] [-p DB PATH] playlist_url
@@ -40,7 +41,7 @@ python3 ytftpl.py -c firefox -s 5 "https://www.youtube.com/playlist?list=PLmXxqS
 ```
 
 ## Result
-If everything goes correctly, the program outputs the processed playlist data to the console for easy copying (if ``--silent`` is _not_ specified), and then attempts to append the playlist to _FreeTube's_ ``playlists.db`` file. Errors are output to console, including the affected YouTube video IDs.
+If everything goes correctly, the program outputs the processed playlist data to the console for easy copying (if ``--silent`` is _not_ specified), and then attempts to append the playlist to _FreeTube's_ ``playlists.db`` file.
 
 ## Requirements
 [Python](https://www.Python.org/downloads/) and [yt-dlp](https://github.com/yt-dlp/yt-dlp) are required to run the source code.  
@@ -63,6 +64,12 @@ ERROR: [youtube] [VIDEO ID]: Video unavailable. This video is no longer availabl
 ERROR: [youtube] [VIDEO ID]: Video unavailable. This video is no longer available because the YouTube account associated with this video has been terminated.
 
 ERROR: [youtube] [VIDEO ID]: Video unavailable. This video is not available
+```
+
+### Long playlists
+When getting the data from a long playlist, _yt-dlp_ may not be able to access every video after a certain threshold due to rate-limiting. This tends to occur with playlists with more than 100 or 200 entries. To combat this, use the ``--sleep`` flag with a low value, like ``3`` seconds.
+```
+ERROR: [youtube] [VIDEO ID]: This content isn't available, try again later.
 ```
 
 ### Missing user authentication
