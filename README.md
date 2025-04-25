@@ -12,9 +12,6 @@ This is a small Python script that transfers YouTube playlists to [FreeTube](htt
     - [Missing user authentication](#missing-user-authentication)
 - [Technical Details](#technical-details)
 
-> [!CAUTION]
-> This script adds data to _playlists.db_ using simple appending of JSON text in Python. It seems like doing this causes issues with FreeTube's _nedb_ database and can result in FreeTube not opening the database correctly anymore. nedb checks for corruption while loading the database into code, with each corrupted line adding to a 10% total threshold of corruption. If this threshold is passed, nedb refuses to open the file. As of now, this has not been solved. See [Issue 10](https://github.com/stkprog/yt-to-ft-playlists/issues/10) for more info.
-
 ## Usage
 Make sure that _FreeTube_ is closed, none of its processes are running and backup your ``playlists.db`` file before running the script.
  
@@ -44,9 +41,10 @@ python3 ytftpl.py -c firefox -s 5 "https://www.youtube.com/playlist?list=PLmXxqS
 If everything goes correctly, the program outputs the processed playlist data to the console for easy copying (if ``--silent`` is _not_ specified), and then attempts to append the playlist to _FreeTube's_ ``playlists.db`` file.
 
 ## Requirements
-[Python](https://www.Python.org/downloads/) and [yt-dlp](https://github.com/yt-dlp/yt-dlp) are required to run the source code.  
+[Python](https://www.Python.org/downloads/) and [yt-dlp](https://github.com/yt-dlp/yt-dlp) are required to run the source code. [Colorama](https://pypi.org/project/colorama/) is used for colored output.
 Last used versions for development:
 * Python version 3.13.2
+* Colorama version 0.4.6-5
 * yt-dlp version 2025.02.19
 
 ## Possible Errors and Issues 
